@@ -50,13 +50,6 @@ toggleContainer.Size = UDim2.new(1, 0, 0, 200)
 toggleContainer.BackgroundTransparency = 1
 toggleContainer.Parent = scrollFrame
 
--- Cheat Toggles
-local godModeToggle = createToggle("God Mode", "Enables invincibility")
-local infiniteAmmoToggle = createToggle("Infinite Ammo", "Removes ammo limits")
-local speedHackToggle = createToggle("Speed Hack", "Increases movement speed")
-local damageBoostToggle = createToggle("Damage Boost", "Multiplies weapon damage")
-local noClipToggle = createToggle("No Clip", "Allows flying through walls")
-
 -- Function to create toggle buttons
 function createToggle(text, description)
     local toggle = Instance.new("Frame")
@@ -102,6 +95,13 @@ function createToggle(text, description)
     toggle.Parent = toggleContainer
     return toggle
 end
+
+-- Cheat Toggles
+local godModeToggle = createToggle("God Mode", "Enables invincibility")
+local infiniteAmmoToggle = createToggle("Infinite Ammo", "Removes ammo limits")
+local speedHackToggle = createToggle("Speed Hack", "Increases movement speed")
+local damageBoostToggle = createToggle("Damage Boost", "Multiplies weapon damage")
+local noClipToggle = createToggle("No Clip", "Allows flying through walls")
 
 -- Cheat Status Tracking
 local activeCheats = {}
