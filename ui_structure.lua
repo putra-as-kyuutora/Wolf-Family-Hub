@@ -40,13 +40,13 @@ closeButton.Parent = header
 local scrollFrame = Instance.new("ScrollingFrame")
 scrollFrame.Size = UDim2.new(1, 0, 1, -45)
 scrollFrame.Position = UDim2.new(0, 0, 0, 45)
-scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 200)
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 300)
 scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
 scrollFrame.Parent = frame
 
 -- Toggle Container
 local toggleContainer = Instance.new("Frame")
-toggleContainer.Size = UDim2.new(1, 0, 0, 220)
+toggleContainer.Size = UDim2.new(1, 0, 0, 270)
 toggleContainer.BackgroundTransparency = 1
 toggleContainer.Parent = scrollFrame
 
@@ -111,6 +111,7 @@ local infiniteAmmoToggle = createToggle("Infinite Ammo", "Removes ammo limits")
 local speedHackToggle = createToggle("Speed Hack", "Increases movement speed")
 local damageBoostToggle = createToggle("Damage Boost", "Multiplies weapon damage")
 local noClipToggle = createToggle("No Clip", "Allows flying through walls")
+local remoteSpyToggle = createToggle("Remote Spy", "Monitors remote events and functions")
 
 -- Cheat Status Tracking
 local activeCheats = {}
@@ -178,6 +179,57 @@ function applyCheat(name, enabled)
                     game.Players.LocalPlayer.Character.Animate.Disabled = true
                     game.Players.LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.FallingDown)
                     wait(0.1)
+                end
+            end)
+        end
+    elseif name == "Remote Spy" then
+        if enabled then
+            spawn(function()
+                print("[Remote Spy] Initializing monitoring...")
+                local filename = "remotespy_log.txt"
+                
+                -- Helper to append logs to local file in executor workspace
+                local function appendToLog(text)
+                    local timeStr = os.date("%Y-%m-%d %H:%M:%S")
+                    local logLine = string.format("[%s] %s", timeStr, text)
+                    if appendfile then
+                        pcall(appendfile, filename, logLine .. "\n")
+                    elseif writefile and readfile then
+                        local current = ""
+                        pcall(function() current = readfile(filename) or "" end)
+                        pcall(writefile, filename, current .. logLine .. "\n")
+                    end
+                end
+                
+                -- Log startup session
+                appendToLog("--- REMOTE SPY SESSION STARTED ---")
+                
+                local success, err = pcall(function()
+                    -- Initialize remote spy
+                    local remoteSpy = require(game.ReplicatedStorage.RemoteSpy)
+                    remoteSpy.StartMonitoring()
+                    
+                    print("[Remote Spy] Waiting for connection...")
+                    repeat wait() until remoteSpy.IsConnected
+                    
+                    -- Setup callback for new events
+                    remoteSpy.OnNewRemoteEvent:Connect(function(event)
+                        local msg = "Found RemoteEvent: " .. tostring(event.Name)
+                        print("[Remote Spy]", msg)
+                        appendToLog(msg)
+                    end)
+                    
+                    -- Setup callback for new functions
+                    remoteSpy.OnNewRemoteFunction:Connect(function(func)
+                        local msg = "Found RemoteFunction: " .. tostring(func.Name)
+                        print("[Remote Spy]", msg)
+                        appendToLog(msg)
+                    end)
+                end)
+                if not success then
+                    local errMsg = "Failed to initialize: " .. tostring(err)
+                    warn("[Remote Spy]", errMsg)
+                    appendToLog(errMsg .. " (Make sure game-specific RemoteSpy module exists in ReplicatedStorage)")
                 end
             end)
         end
