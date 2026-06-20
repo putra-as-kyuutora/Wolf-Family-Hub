@@ -23,6 +23,8 @@ header.FontSize = Enum.FontSize.Size18
 header.TextScaled = true
 header.Parent = frame
 
+local resetButton = nil
+
 -- Close Button
 local closeButton = Instance.new("TextButton")
 closeButton.Text = "X"
@@ -35,6 +37,36 @@ closeButton.MouseButton1Click:Connect(function()
     cheatHub.Enabled = false
 end)
 closeButton.Parent = header
+
+-- Minimize Button
+local minimizeButton = Instance.new("TextButton")
+minimizeButton.Text = "-"
+minimizeButton.Size = UDim2.new(0, 30, 0, 30)
+minimizeButton.Position = UDim2.new(1, -70, 0, 5)
+minimizeButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeButton.FontSize = Enum.FontSize.Size18
+
+local isMinimized = false
+minimizeButton.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        minimizeButton.Text = "+"
+        frame.Size = UDim2.new(0, 250, 0, 40)
+        scrollFrame.Visible = false
+        if resetButton then
+            resetButton.Visible = false
+        end
+    else
+        minimizeButton.Text = "-"
+        frame.Size = UDim2.new(0, 250, 0, 400)
+        scrollFrame.Visible = true
+        if resetButton then
+            resetButton.Visible = true
+        end
+    end
+end)
+minimizeButton.Parent = header
 
 -- Scroll Frame
 local scrollFrame = Instance.new("ScrollingFrame")
@@ -265,7 +297,7 @@ function applyCheat(name, enabled)
 end
 
 -- Reset All Cheats
-local resetButton = Instance.new("TextButton")
+resetButton = Instance.new("TextButton")
 resetButton.Text = "Reset All"
 resetButton.Size = UDim2.new(1, 0, 0, 40)
 resetButton.Position = UDim2.new(0, 0, 1, -45)
