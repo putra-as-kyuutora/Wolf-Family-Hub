@@ -46,16 +46,25 @@ scrollFrame.Parent = frame
 
 -- Toggle Container
 local toggleContainer = Instance.new("Frame")
-toggleContainer.Size = UDim2.new(1, 0, 0, 200)
+toggleContainer.Size = UDim2.new(1, 0, 0, 220)
 toggleContainer.BackgroundTransparency = 1
 toggleContainer.Parent = scrollFrame
 
+local listLayout = Instance.new("UIListLayout")
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Padding = UDim.new(0, 5)
+listLayout.Parent = toggleContainer
+
+local toggleCount = 0
+
 -- Function to create toggle buttons
 function createToggle(text, description)
+    toggleCount = toggleCount + 1
     local toggle = Instance.new("Frame")
     toggle.Size = UDim2.new(1, 0, 0, 40)
     toggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     toggle.BorderSizePixel = 0
+    toggle.LayoutOrder = toggleCount
     
     local label = Instance.new("TextLabel")
     label.Text = text
