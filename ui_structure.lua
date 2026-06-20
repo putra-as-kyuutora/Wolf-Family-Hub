@@ -183,6 +183,7 @@ function applyCheat(name, enabled)
             end)
         end
     elseif name == "Remote Spy" then
+        shared.RemoteSpyActive = enabled
         if enabled then
             spawn(function()
                 print("[Remote Spy] Initializing monitoring...")
@@ -204,34 +205,61 @@ function applyCheat(name, enabled)
                 -- Log startup session
                 appendToLog("--- REMOTE SPY SESSION STARTED ---")
                 
-                local success, err = pcall(function()
-                    -- Initialize remote spy
-                    local remoteSpy = require(game.ReplicatedStorage.RemoteSpy)
-                    remoteSpy.StartMonitoring()
-                    
-                    print("[Remote Spy] Waiting for connection...")
-                    repeat wait() until remoteSpy.IsConnected
-                    
-                    -- Setup callback for new events
-                    remoteSpy.OnNewRemoteEvent:Connect(function(event)
-                        local msg = "Found RemoteEvent: " .. tostring(event.Name)
-                        print("[Remote Spy]", msg)
-                        appendToLog(msg)
+                -- Only hook once globally to prevent performance lag or crashes
+                if not shared.RemoteSpyHooked then
+                    local success, err = pcall(function()
+                        if not hookmetamethod then
+                            error("Executor does not support hookmetamethod API.")
+                        end
+                        
+                        local __namecall
+                        __namecall = hookmetamethod(game, "__namecall", function(self, ...)
+                            local method = getnamecallmethod()
+                            local args = {...}
+                            
+                            -- Only log when Remote Spy is enabled
+                            if shared.RemoteSpyActive then
+                                if method == "FireServer" and self.ClassName == "RemoteEvent" then
+                                    local eventName = self.Name
+                                    local argsStr = ""
+                                    for i, arg in ipairs(args) do
+                                        argsStr = argsStr .. string.format("\n  Arg %d: %s (%s)", i, tostring(arg), typeof(arg))
+                                    end
+                                    local msg = string.format("RemoteEvent Fired: %s%s", eventName, argsStr)
+                                    print("[Remote Spy]", msg)
+                                    appendToLog(msg)
+                                elseif method == "InvokeServer" and self.ClassName == "RemoteFunction" then
+                                    local funcName = self.Name
+                                    local argsStr = ""
+                                    for i, arg in ipairs(args) do
+                                        argsStr = argsStr .. string.format("\n  Arg %d: %s (%s)", i, tostring(arg), typeof(arg))
+                                    end
+                                    local msg = string.format("RemoteFunction Invoked: %s%s", funcName, argsStr)
+                                    print("[Remote Spy]", msg)
+                                    appendToLog(msg)
+                                end
+                            end
+                            
+                            return __namecall(self, ...)
+                        end)
+                        
+                        shared.RemoteSpyHooked = true
+                        print("[Remote Spy] Native hook established successfully.")
+                        appendToLog("Native hook established successfully.")
                     end)
                     
-                    -- Setup callback for new functions
-                    remoteSpy.OnNewRemoteFunction:Connect(function(func)
-                        local msg = "Found RemoteFunction: " .. tostring(func.Name)
-                        print("[Remote Spy]", msg)
-                        appendToLog(msg)
-                    end)
-                end)
-                if not success then
-                    local errMsg = "Failed to initialize: " .. tostring(err)
-                    warn("[Remote Spy]", errMsg)
-                    appendToLog(errMsg .. " (Make sure game-specific RemoteSpy module exists in ReplicatedStorage)")
+                    if not success then
+                        local errMsg = "Failed to establish native hook: " .. tostring(err)
+                        warn("[Remote Spy]", errMsg)
+                        appendToLog(errMsg)
+                    end
+                else
+                    print("[Remote Spy] Remote Spy reactivated.")
+                    appendToLog("Remote Spy reactivated.")
                 end
             end)
+        else
+            print("[Remote Spy] Remote Spy deactivated.")
         end
     end
 end
