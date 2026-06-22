@@ -1226,7 +1226,7 @@ local function AddDraggingFunctionality(DragPoint, Main)
 	pcall(function()
 		local Dragging, DragInput, MousePos, FramePos = false
 		DragPoint.InputBegan:Connect(function(Input)
-			if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+			if Input.UserInputType == Enum.UserInputType.MouseButton1 then
 				Dragging = true
 				MousePos = Input.Position
 				FramePos = Main.Position
@@ -1788,8 +1788,45 @@ function OrionLib:MakeWindow(WindowConfig)
 		end
 	end)
 
+	-- Floating icon button for when minimized
+	local FloatIcon = Instance.new("ImageButton")
+	FloatIcon.Name = "WolfFloat"
+	FloatIcon.Size = UDim2.new(0, 50, 0, 50)
+	FloatIcon.Position = UDim2.new(0, 10, 0.5, -25)
+	FloatIcon.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+	FloatIcon.Image = "rbxassetid://10734950453" -- Wolf/placeholder icon
+	FloatIcon.ImageTransparency = 0
+	FloatIcon.ScaleType = Enum.ScaleType.Fit
+	FloatIcon.Visible = false
+	FloatIcon.ZIndex = 999
+	FloatIcon.Parent = Orion
+	local _FICorner = Instance.new("UICorner")
+	_FICorner.CornerRadius = UDim.new(0.2, 0)
+	_FICorner.Parent = FloatIcon
+	local _FIStroke = Instance.new("UIStroke")
+	_FIStroke.Color = Color3.fromRGB(180, 20, 20)
+	_FIStroke.Thickness = 2
+	_FIStroke.Parent = FloatIcon
+	-- Drag support for float icon
+	local _fi_drag, _fi_start, _fi_startpos = false, nil, nil
+	FloatIcon.InputBegan:Connect(function(inp)
+		if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+			_fi_drag = true; _fi_start = inp.Position; _fi_startpos = FloatIcon.Position
+			inp.Changed:Connect(function() if inp.UserInputState == Enum.UserInputState.End then _fi_drag = false end end)
+		end
+	end)
+	FloatIcon.InputChanged:Connect(function(inp)
+		if _fi_drag and (inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch) then
+			local d = inp.Position - _fi_start
+			FloatIcon.Position = UDim2.new(_fi_startpos.X.Scale, _fi_startpos.X.Offset + d.X, _fi_startpos.Y.Scale, _fi_startpos.Y.Offset + d.Y)
+		end
+	end)
+
 	AddConnection(MinimizeBtn.MouseButton1Up, function()
 		if Minimized then
+			-- RESTORE: hide float icon, show full window
+			FloatIcon.Visible = false
+			MainWindow.Visible = true
 			TweenService:Create(MainWindow, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 615, 0, 344)}):Play()
 			MinimizeBtn.Ico.Image = "rbxassetid://7072719338"
 			wait(.02)
@@ -1797,13 +1834,29 @@ function OrionLib:MakeWindow(WindowConfig)
 			WindowStuff.Visible = true
 			WindowTopBarLine.Visible = true
 		else
+			-- MINIMIZE: hide window, show float icon
 			MainWindow.ClipsDescendants = true
 			WindowTopBarLine.Visible = false
 			MinimizeBtn.Ico.Image = "rbxassetid://7072720870"
-
-			TweenService:Create(MainWindow, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, WindowName.TextBounds.X + 140, 0, 50)}):Play()
-			wait(0.1)
-			WindowStuff.Visible = false	
+			TweenService:Create(MainWindow, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 0, 0, 0)}):Play()
+			wait(0.35)
+			MainWindow.Visible = false
+			WindowStuff.Visible = false
+			FloatIcon.Visible = true
+			-- Clicking float icon restores window
+			FloatIcon.MouseButton1Click:Connect(function()
+				if Minimized then
+					FloatIcon.Visible = false
+					MainWindow.Visible = true
+					TweenService:Create(MainWindow, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 615, 0, 344)}):Play()
+					MinimizeBtn.Ico.Image = "rbxassetid://7072719338"
+					wait(0.02)
+					MainWindow.ClipsDescendants = false
+					WindowStuff.Visible = true
+					WindowTopBarLine.Visible = true
+					Minimized = false
+				end
+			end)
 		end
 		Minimized = not Minimized    
 	end)
@@ -2179,12 +2232,12 @@ function OrionLib:MakeWindow(WindowConfig)
 				}), "Second")
 
 				SliderBar.InputBegan:Connect(function(Input)
-					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then 
+					if Input.UserInputType == Enum.UserInputType.MouseButton1 then 
 						Dragging = true 
 					end 
 				end)
 				SliderBar.InputEnded:Connect(function(Input) 
-					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then 
+					if Input.UserInputType == Enum.UserInputType.MouseButton1 then 
 						Dragging = false 
 					end 
 				end)
@@ -2416,7 +2469,7 @@ function OrionLib:MakeWindow(WindowConfig)
 				end)
 
 				AddConnection(Click.InputEnded, function(Input)
-					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+					if Input.UserInputType == Enum.UserInputType.MouseButton1 then
 						if Bind.Binding then return end
 						Bind.Binding = true
 						BindBox.Value.Text = ""
@@ -2425,6 +2478,7 @@ function OrionLib:MakeWindow(WindowConfig)
 
 				AddConnection(UserInputService.InputBegan, function(Input)
 					if UserInputService:GetFocusedTextBox() then return end
+					if Input.UserInputType == Enum.UserInputType.Touch then return end
 					if (Input.KeyCode.Name == Bind.Value or Input.UserInputType.Name == Bind.Value) and not Bind.Binding then
 						if BindConfig.Hold then
 							Holding = true
@@ -3005,9 +3059,14 @@ local function UpdateAllChams()
     end
 end
 
-table.insert(VisualHacks.Connections, RunService.RenderStepped:Connect(function()
-    UpdateAllChams()
-end))
+task.spawn(function()
+    while true do
+        if VisualHacks.KillerChams or VisualHacks.SurvivorChams or VisualHacks.GeneratorChams then
+            pcall(UpdateAllChams)
+        end
+        task.wait(0.5)
+    end
+end)
 
 function VisualHacks:ToggleKiller(state) self.KillerChams = state end
 function VisualHacks:SetKillerColor(color) self.KillerColor = color end
@@ -3032,6 +3091,7 @@ local Camera = workspace.CurrentCamera
 
 local CombatHacks = {
     AimbotEnabled = false,
+    WallCheck = true,
     SilentAimEnabled = false,
     SilentAimHitChance = 100,
     AimbotRadius = 150,
@@ -3077,7 +3137,6 @@ local function GetClosestPlayer()
             if isValidTarget then
                 local targetPartName = CombatHacks.TargetPart
                 if targetPartName == "Torso" then
-                    -- Support for R15 and R6
                     if not player.Character:FindFirstChild("Torso") and player.Character:FindFirstChild("UpperTorso") then
                         targetPartName = "UpperTorso"
                     end
@@ -3087,10 +3146,30 @@ local function GetClosestPlayer()
                 if targetPart then
                     local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
                     if onScreen then
-                        local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-                        if dist < closestDist then
-                            closestDist = dist
-                            closestPlayer = player
+                        -- WALL CHECK (Raycast)
+                        local isVisible = true
+                        if CombatHacks.WallCheck then
+                            local origin = Camera.CFrame.Position
+                            local direction = (targetPart.Position - origin)
+                            
+                            local rayParams = RaycastParams.new()
+                            rayParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+                            rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                            rayParams.IgnoreWater = true
+                            
+                            local result = workspace:Raycast(origin, direction, rayParams)
+                            if result and result.Instance and not result.Instance:IsDescendantOf(player.Character) then
+                                -- We hit something that is not the target character (it's a wall!)
+                                isVisible = false
+                            end
+                        end
+                        
+                        if isVisible then
+                            local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                            if dist < closestDist then
+                                closestDist = dist
+                                closestPlayer = player
+                            end
                         end
                     end
                 end
@@ -3101,46 +3180,14 @@ local function GetClosestPlayer()
     return closestPlayer
 end
 
--- SILENT AIM HOOK
-local OldNamecall
-OldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-    local args = {...}
-    local method = getnamecallmethod()
-    
-    if CombatHacks.SilentAimEnabled and method == "Raycast" and self == workspace then
-        -- Only override if we have a target
-        local target = GetClosestPlayer()
-        
-        -- Hit chance check
-        local chance = math.random(1, 100)
-        if target and target.Character and chance <= CombatHacks.SilentAimHitChance then
-            
-            local targetPartName = CombatHacks.TargetPart
-            if targetPartName == "Torso" and not target.Character:FindFirstChild("Torso") and target.Character:FindFirstChild("UpperTorso") then
-                targetPartName = "UpperTorso"
-            end
-            
-            local targetPart = target.Character:FindFirstChild(targetPartName)
-            if targetPart then
-                -- Modify the raycast direction to point directly at the target
-                -- Raycast args: origin, direction, raycastParams
-                if typeof(args[1]) == "Vector3" and typeof(args[2]) == "Vector3" then
-                    local origin = args[1]
-                    local targetPos = targetPart.Position
-                    local direction = (targetPos - origin).Unit * 1000 -- Shoot towards target
-                    
-                    args[2] = direction
-                    return OldNamecall(self, unpack(args))
-                end
-            end
-        end
-    end
-    
-    return OldNamecall(self, ...)
-end))
+-- SILENT AIM: Hook is registered LAZILY (only when user enables it)
+-- This prevents lobby/character movement interference
+getgenv()._SilentAimHookInstalled = false
 
 
 table.insert(CombatHacks.Connections, RunService.RenderStepped:Connect(function()
+    -- Guard: only run when in actual game (not lobby)
+    if not game:IsLoaded() then return end
     -- Update FOV
     FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     FOVCircle.Radius = CombatHacks.AimbotRadius
@@ -3206,6 +3253,41 @@ end
 
 function CombatHacks:ToggleSilentAim(state)
     self.SilentAimEnabled = state
+    -- Install hook lazily on first enable to avoid lobby interference
+    if state and not getgenv()._SilentAimHookInstalled then
+        getgenv()._SilentAimHookInstalled = true
+        local _OldNC
+        _OldNC = hookmetamethod(game, "__namecall", newcclosure(function(self2, ...)
+            local args = {...}
+            local method = getnamecallmethod()
+            if CombatHacks.SilentAimEnabled and method == "Raycast" and self2 == workspace then
+                if typeof(args[1]) == "Vector3" and typeof(args[2]) == "Vector3" then
+                    local dirLen = args[2].Magnitude
+                    if dirLen > 50 then
+                        local tgt = GetClosestPlayer()
+                        local chance = math.random(1, 100)
+                        if tgt and tgt.Character and chance <= CombatHacks.SilentAimHitChance then
+                            local partName = CombatHacks.TargetPart
+                            if partName == "Torso" and not tgt.Character:FindFirstChild("Torso") and tgt.Character:FindFirstChild("UpperTorso") then
+                                partName = "UpperTorso"
+                            end
+                            local tgtPart = tgt.Character:FindFirstChild(partName)
+                            if tgtPart then
+                                local dir = (tgtPart.Position - args[1]).Unit * dirLen
+                                args[2] = dir
+                                return _OldNC(self2, unpack(args))
+                            end
+                        end
+                    end
+                end
+            end
+            return _OldNC(self2, ...)
+        end))
+    end
+end
+
+function CombatHacks:ToggleWallCheck(state)
+    self.WallCheck = state
 end
 
 function CombatHacks:SetSilentAimHitChance(val)
@@ -3278,7 +3360,507 @@ MovementSection:AddSlider({
     end    
 })
 
+-- K E Y B I N D S   &   S H O R T C U T S
+local BindTab = Window:MakeTab({
+    Name = "Keybinds",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+-- Shared toggle functions (used by both keybind and button shortcut)
+local function wolfToggleSpeed()
+    if getgenv().MovementHacks then
+        local cur = getgenv().MovementHacks.SpeedhackEnabled or false
+        getgenv().MovementHacks:ToggleSpeedhack(not cur, getgenv().MovementHacks.WalkSpeed or 24)
+        getgenv().MovementHacks.SpeedhackEnabled = not cur
+        OrionLib:MakeNotification({ Name = "Speed", Content = (not cur) and "ON" or "OFF", Image = "rbxassetid://4384403532", Time = 2 })
+    end
+end
+local function wolfToggleAimbot()
+    if getgenv().CombatHacks then
+        local cur = getgenv().CombatHacks.AimbotEnabled or false
+        getgenv().CombatHacks:ToggleAimbot(not cur)
+        OrionLib:MakeNotification({ Name = "Aimbot", Content = (not cur) and "ON" or "OFF", Image = "rbxassetid://4384403532", Time = 2 })
+    end
+end
+local function wolfToggleSilentAim()
+    if getgenv().CombatHacks then
+        local cur = getgenv().CombatHacks.SilentAimEnabled or false
+        getgenv().CombatHacks:ToggleSilentAim(not cur)
+        OrionLib:MakeNotification({ Name = "Silent Aim", Content = (not cur) and "ON" or "OFF", Image = "rbxassetid://4384403532", Time = 2 })
+    end
+end
+local function wolfToggleKillerChams()
+    if getgenv().VisualHacks then
+        local cur = getgenv().VisualHacks.KillerChamsEnabled or false
+        getgenv().VisualHacks:ToggleKiller(not cur)
+        getgenv().VisualHacks.KillerChamsEnabled = not cur
+        OrionLib:MakeNotification({ Name = "K.Chams", Content = (not cur) and "ON" or "OFF", Image = "rbxassetid://4384403532", Time = 2 })
+    end
+end
+local function wolfToggleSurvivorChams()
+    if getgenv().VisualHacks then
+        local cur = getgenv().VisualHacks.SurvivorChamsEnabled or false
+        getgenv().VisualHacks:ToggleSurvivor(not cur)
+        getgenv().VisualHacks.SurvivorChamsEnabled = not cur
+        OrionLib:MakeNotification({ Name = "S.Chams", Content = (not cur) and "ON" or "OFF", Image = "rbxassetid://4384403532", Time = 2 })
+    end
+end
+
+-- === KEYBOARD KEYBINDS (PC only, no touch) ===
+local BindSection = BindTab:AddSection({ Name = "Keyboard Shortcuts (PC)" })
+
+BindSection:AddBind({ Name = "Toggle Speedhack", Default = Enum.KeyCode.V, Hold = false, Callback = wolfToggleSpeed })
+BindSection:AddBind({ Name = "Toggle Aimbot", Default = Enum.KeyCode.Z, Hold = false, Callback = wolfToggleAimbot })
+BindSection:AddBind({ Name = "Toggle Silent Aim", Default = Enum.KeyCode.X, Hold = false, Callback = wolfToggleSilentAim })
+BindSection:AddBind({ Name = "Toggle Killer Chams", Default = Enum.KeyCode.C, Hold = false, Callback = wolfToggleKillerChams })
+BindSection:AddBind({ Name = "Toggle Survivor Chams", Default = Enum.KeyCode.B, Hold = false, Callback = wolfToggleSurvivorChams })
+
+-- === MOBILE BUTTON SHORTCUTS ===
+local MobileSection = BindTab:AddSection({ Name = "Mobile Button Shortcuts" })
+
+if not getgenv()._WolfMobileBtns then
+    getgenv()._WolfMobileBtns = {
+        SPD = true,
+        AIM = true,
+        SIL = true,
+        KC = true,
+        SC = true
+    }
+end
+
+local function redrawFloatingButtons()
+    if not getgenv()._WolfShortcutGui then return end
+    local container = getgenv()._WolfShortcutGui:FindFirstChild("BtnContainer")
+    if not container then return end
+    
+    -- Clear existing buttons
+    for _, child in ipairs(container:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    
+    local all_buttons = {
+        {id = "SPD", text = "SPD", callback = wolfToggleSpeed, color = Color3.fromRGB(50, 180, 50)},
+        {id = "AIM", text = "AIM", callback = wolfToggleAimbot, color = Color3.fromRGB(180, 50, 50)},
+        {id = "SIL", text = "SIL", callback = wolfToggleSilentAim, color = Color3.fromRGB(180, 120, 20)},
+        {id = "KC", text = "K.C", callback = wolfToggleKillerChams, color = Color3.fromRGB(255, 93, 108)},
+        {id = "SC", text = "S.C", callback = wolfToggleSurvivorChams, color = Color3.fromRGB(64, 224, 255)},
+    }
+    
+    local active_buttons = {}
+    for _, btn in ipairs(all_buttons) do
+        if getgenv()._WolfMobileBtns[btn.id] then
+            table.insert(active_buttons, btn)
+        end
+    end
+    
+    -- Resize container based on button count
+    local btnCount = #active_buttons
+    if btnCount == 0 then
+        container.BackgroundTransparency = 1
+    else
+        container.BackgroundTransparency = 0.4
+        container.Size = UDim2.new(0, 52, 0, (btnCount * 44) + (btnCount * 4) + 12)
+    end
+    
+    for _, btn in ipairs(active_buttons) do
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.new(1, 0, 0, 44)
+        b.BackgroundColor3 = btn.color
+        b.BackgroundTransparency = 0.3
+        b.Text = btn.text
+        b.TextColor3 = Color3.new(1, 1, 1)
+        b.TextSize = 14
+        b.Font = Enum.Font.GothamBold
+        b.BorderSizePixel = 0
+        b.Parent = container
+        
+        local bc = Instance.new("UICorner")
+        bc.CornerRadius = UDim.new(0, 6)
+        bc.Parent = b
+        
+        b.MouseButton1Click:Connect(btn.callback)
+        b.TouchTap:Connect(function() btn.callback() end)
+    end
+end
+
+MobileSection:AddToggle({
+    Name = "Enable Floating Shortcut Buttons",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            if getgenv()._WolfShortcutGui then pcall(function() getgenv()._WolfShortcutGui:Destroy() end) end
+            
+            local PlayerGui = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+            local sg = Instance.new("ScreenGui")
+            sg.Name = "WolfShortcuts"
+            sg.DisplayOrder = 9999
+            sg.ResetOnSpawn = false
+            sg.Parent = PlayerGui
+            getgenv()._WolfShortcutGui = sg
+            
+            local container = Instance.new("Frame")
+            container.Name = "BtnContainer"
+            container.Position = UDim2.new(1, -60, 0.5, -140)
+            container.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+            container.BackgroundTransparency = 0.4
+            container.BorderSizePixel = 0
+            container.Parent = sg
+            
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0, 8)
+            corner.Parent = container
+            
+            local layout = Instance.new("UIListLayout")
+            layout.SortOrder = Enum.SortOrder.LayoutOrder
+            layout.Padding = UDim.new(0, 4)
+            layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+            layout.Parent = container
+            
+            local pad = Instance.new("UIPadding")
+            pad.PaddingTop = UDim.new(0, 6)
+            pad.PaddingBottom = UDim.new(0, 6)
+            pad.PaddingLeft = UDim.new(0, 4)
+            pad.PaddingRight = UDim.new(0, 4)
+            pad.Parent = container
+            
+            local dragging, dragStart, startPos
+            container.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    dragging = true
+                    dragStart = input.Position
+                    startPos = container.Position
+                    input.Changed:Connect(function()
+                        if input.UserInputState == Enum.UserInputState.End then dragging = false end
+                    end)
+                end
+            end)
+            game:GetService("UserInputService").InputChanged:Connect(function(input)
+                if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+                    local delta = input.Position - dragStart
+                    container.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+                end
+            end)
+            
+            redrawFloatingButtons()
+            OrionLib:MakeNotification({ Name = "Shortcuts", Content = "Floating buttons enabled (drag to move)", Image = "rbxassetid://4384403532", Time = 3 })
+        else
+            if getgenv()._WolfShortcutGui then
+                pcall(function() getgenv()._WolfShortcutGui:Destroy() end)
+                getgenv()._WolfShortcutGui = nil
+            end
+            OrionLib:MakeNotification({ Name = "Shortcuts", Content = "Floating buttons disabled", Image = "rbxassetid://4384403532", Time = 2 })
+        end
+    end    
+})
+
+MobileSection:AddToggle({ Name = "Show Speedhack (SPD)", Default = true, Callback = function(v) getgenv()._WolfMobileBtns.SPD = v; redrawFloatingButtons() end })
+MobileSection:AddToggle({ Name = "Show Aimbot (AIM)", Default = true, Callback = function(v) getgenv()._WolfMobileBtns.AIM = v; redrawFloatingButtons() end })
+MobileSection:AddToggle({ Name = "Show Silent Aim (SIL)", Default = true, Callback = function(v) getgenv()._WolfMobileBtns.SIL = v; redrawFloatingButtons() end })
+MobileSection:AddToggle({ Name = "Show Killer Chams (K.C)", Default = true, Callback = function(v) getgenv()._WolfMobileBtns.KC = v; redrawFloatingButtons() end })
+MobileSection:AddToggle({ Name = "Show Survivor Chams (S.C)", Default = true, Callback = function(v) getgenv()._WolfMobileBtns.SC = v; redrawFloatingButtons() end })
+
+-- === CAMERA / FOV SETTINGS ===
+local CamSection = BindTab:AddSection({ Name = "Camera Settings" })
+
+CamSection:AddSlider({
+    Name = "Field of View (FOV)",
+    Min = 30,
+    Max = 120,
+    Default = 70,
+    Color = Color3.fromRGB(100, 100, 255),
+    Increment = 1,
+    ValueName = "FOV",
+    Callback = function(Value)
+        pcall(function()
+            workspace.CurrentCamera.FieldOfView = Value
+        end)
+        -- Keep updating FOV every frame to prevent game from resetting it
+        if getgenv()._WolfFOVConn then
+            pcall(function() getgenv()._WolfFOVConn:Disconnect() end)
+        end
+        if Value ~= 70 then
+            getgenv()._WolfFOV = Value
+            getgenv()._WolfFOVConn = game:GetService("RunService").RenderStepped:Connect(function()
+                pcall(function()
+                    if workspace.CurrentCamera.FieldOfView ~= getgenv()._WolfFOV then
+                        workspace.CurrentCamera.FieldOfView = getgenv()._WolfFOV
+                    end
+                end)
+            end)
+        else
+            getgenv()._WolfFOV = nil
+        end
+    end    
+})
+
+-- === NO FOG ===
+CamSection:AddToggle({
+    Name = "No Fog",
+    Default = false,
+    Callback = function(Value)
+        getgenv()._WolfNoFog = Value
+        if Value then
+            -- Remove fog and keep it removed
+            if getgenv()._WolfFogConn then
+                pcall(function() getgenv()._WolfFogConn:Disconnect() end)
+            end
+            getgenv()._WolfFogConn = game:GetService("RunService").RenderStepped:Connect(function()
+                if not getgenv()._WolfNoFog then return end
+                pcall(function()
+                    local lighting = game:GetService("Lighting")
+                    lighting.FogEnd = 9e9
+                    lighting.FogStart = 9e9
+                    -- Also remove Atmosphere if exists
+                    for _, child in ipairs(lighting:GetChildren()) do
+                        if child:IsA("Atmosphere") then
+                            child.Density = 0
+                            child.Offset = 0
+                        end
+                    end
+                end)
+            end)
+            OrionLib:MakeNotification({ Name = "No Fog", Content = "Fog removed", Image = "rbxassetid://4384403532", Time = 2 })
+        else
+            if getgenv()._WolfFogConn then
+                pcall(function() getgenv()._WolfFogConn:Disconnect() end)
+                getgenv()._WolfFogConn = nil
+            end
+            OrionLib:MakeNotification({ Name = "No Fog", Content = "Fog restored", Image = "rbxassetid://4384403532", Time = 2 })
+        end
+    end    
+})
+
 -- V I S U A L S   T A B
+-- C O M B A T   T A B
+local CombatTab = Window:MakeTab({
+    Name = "Combat",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+local CombatSection = CombatTab:AddSection({
+    Name = "Combat Hacks"
+})
+
+CombatSection:AddToggle({
+    Name = "Auto Aimbot (Mobile/PC)",
+    Default = false,
+    Callback = function(Value)
+        if getgenv().CombatHacks then getgenv().CombatHacks:ToggleAimbot(Value) end
+    end    
+})
+
+CombatSection:AddToggle({
+    Name = "Aimbot Wall Check",
+    Default = true,
+    Callback = function(Value)
+        if getgenv().CombatHacks then getgenv().CombatHacks:ToggleWallCheck(Value) end
+    end    
+})
+
+CombatSection:AddToggle({
+    Name = "Silent Aim (Magic Bullet)",
+    Default = false,
+    Callback = function(Value)
+        if getgenv().CombatHacks then getgenv().CombatHacks:ToggleSilentAim(Value) end
+    end    
+})
+
+CombatSection:AddSlider({
+    Name = "Silent Aim Hit Chance",
+    Min = 0,
+    Max = 100,
+    Default = 100,
+    Color = Color3.fromRGB(180, 20, 20),
+    Increment = 1,
+    ValueName = "%",
+    Callback = function(Value)
+        if getgenv().CombatHacks then getgenv().CombatHacks:SetSilentAimHitChance(Value) end
+    end    
+})
+
+CombatSection:AddDropdown({
+    Name = "Aimbot Target",
+    Default = "All",
+    Options = {"All", "Killer", "Survivor"},
+    Callback = function(Value)
+        if getgenv().CombatHacks then getgenv().CombatHacks:SetTargetType(Value) end
+    end    
+})
+
+CombatSection:AddDropdown({
+    Name = "Target Part",
+    Default = "Head",
+    Options = {"Head", "Torso", "HumanoidRootPart"},
+    Callback = function(Value)
+        if getgenv().CombatHacks then getgenv().CombatHacks:SetTargetPart(Value) end
+    end    
+})
+
+CombatSection:AddToggle({
+    Name = "Show FOV Circle",
+    Default = false,
+    Callback = function(Value)
+        if getgenv().CombatHacks then getgenv().CombatHacks:ToggleFOV(Value) end
+    end    
+})
+
+CombatSection:AddToggle({
+    Name = "Auto Parry (Dagger)",
+    Default = false,
+    Callback = function(Value)
+        getgenv().AutoParryEnabled = Value
+        if Value and not getgenv().AutoParryHooked then
+            getgenv().AutoParryHooked = true
+            
+            local ParryRunService = game:GetService("RunService")
+            local ParryPlayers = game:GetService("Players")
+            local ParryLocalPlayer = ParryPlayers.LocalPlayer
+            local ParryVIM = game:GetService("VirtualInputManager")
+            local ParryUIS = game:GetService("UserInputService")
+            
+            -- Track killer positions to detect velocity (like open-source reference)
+            local lastKillerPositions = {}
+            local lastParryTime = 0
+            local PARRY_COOLDOWN = 0.5
+            local PARRY_DISTANCE = 8 -- studs - trigger distance for dagger parry
+            local DAGGER_KEYBIND = 70 -- 'F' key (Roblox Keycode 70 = F)
+            
+            local parryConnection
+            parryConnection = ParryRunService.RenderStepped:Connect(function(dt)
+                if not getgenv().AutoParryEnabled then
+                    parryConnection:Disconnect()
+                    getgenv().AutoParryHooked = false
+                    return
+                end
+                
+                pcall(function()
+                    local char = ParryLocalPlayer.Character
+                    if not char then return end
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    if not hrp then return end
+                    
+                    -- Check if holding a Dagger tool
+                    local hasDagger = false
+                    for _, item in ipairs(char:GetChildren()) do
+                        if item:IsA("Tool") and item.Name:lower():find("dagger") then
+                            hasDagger = true
+                            break
+                        end
+                    end
+                    if not hasDagger then return end
+                    
+                    local now = tick()
+                    if (now - lastParryTime) < PARRY_COOLDOWN then return end
+                    
+                    for _, player in pairs(ParryPlayers:GetPlayers()) do
+                        if player == ParryLocalPlayer then continue end
+                        local isKiller = player.Team and player.Team.Name:lower():find("killer")
+                        if not isKiller then continue end
+                        
+                        local eChar = player.Character
+                        if not eChar then continue end
+                        local eHrp = eChar:FindFirstChild("HumanoidRootPart")
+                        if not eHrp then continue end
+                        
+                        local dist = (eHrp.Position - hrp.Position).Magnitude
+                        
+                        -- Calculate killer velocity (like the open-source BallShadow method)
+                        local pid = tostring(player.UserId)
+                        local prevPos = lastKillerPositions[pid]
+                        lastKillerPositions[pid] = eHrp.Position
+                        
+                        if prevPos then
+                            local velocity = (eHrp.Position - prevPos) / dt
+                            local speed = velocity.Magnitude
+                            
+                            -- Check if killer is charging toward player at speed
+                            local dirToPlayer = (hrp.Position - eHrp.Position).Unit
+                            local velDir = velocity.Unit
+                            local dotProduct = velDir:Dot(dirToPlayer)
+                            
+                            -- Parry if: close enough AND killer is moving toward us fast
+                            if dist <= PARRY_DISTANCE and dotProduct > 0.4 and speed > 5 then
+                                lastParryTime = now
+                                -- Trigger dagger block
+                                pcall(function()
+                                    if ParryUIS.TouchEnabled then
+                                        -- Mobile: simulate touch on the parry button
+                                        local pgui = ParryLocalPlayer:FindFirstChild("PlayerGui")
+                                        if pgui then
+                                            -- Try to find and click the dagger action button
+                                            local function findButton(parent)
+                                                for _, obj in ipairs(parent:GetDescendants()) do
+                                                    if obj:IsA("ImageButton") or obj:IsA("TextButton") then
+                                                        local name = obj.Name:lower()
+                                                        if name:find("parry") or name:find("block") or name:find("deflect") or name:find("action") then
+                                                            local gs = game:GetService("GuiService")
+                                                            local inset = gs:GetGuiInset()
+                                                            local p, s = obj.AbsolutePosition, obj.AbsoluteSize
+                                                            local cx, cy = p.X + s.X/2 + inset.X, p.Y + s.Y/2 + inset.Y
+                                                            ParryVIM:SendTouchEvent(9900, 0, cx, cy)
+                                                            task.wait(0.05)
+                                                            ParryVIM:SendTouchEvent(9900, 2, cx, cy)
+                                                            return true
+                                                        end
+                                                    end
+                                                end
+                                                return false
+                                            end
+                                            if not findButton(pgui) then
+                                                -- Fallback: press F key
+                                                keypress(DAGGER_KEYBIND)
+                                                task.wait(0.05)
+                                                keyrelease(DAGGER_KEYBIND)
+                                            end
+                                        end
+                                    else
+                                        -- PC: press F key
+                                        keypress(DAGGER_KEYBIND)
+                                        task.wait(0.05)
+                                        keyrelease(DAGGER_KEYBIND)
+                                    end
+                                end)
+                            end
+                        end
+                    end
+                end)
+            end)
+        elseif not Value then
+            getgenv().AutoParryHooked = false
+        end
+    end    
+})
+
+CombatSection:AddSlider({
+    Name = "FOV Radius",
+    Min = 50,
+    Max = 800,
+    Default = 150,
+    Color = Color3.fromRGB(180, 20, 20),
+    Increment = 10,
+    ValueName = "px",
+    Callback = function(Value)
+        if getgenv().CombatHacks then getgenv().CombatHacks:SetRadius(Value) end
+    end    
+})
+
+CombatSection:AddSlider({
+    Name = "Aimbot Smoothness",
+    Min = 1,
+    Max = 10,
+    Default = 5,
+    Color = Color3.fromRGB(180, 20, 20),
+    Increment = 1,
+    ValueName = "",
+    Callback = function(Value)
+        if getgenv().CombatHacks then getgenv().CombatHacks:SetSmoothness(Value / 10) end
+    end    
+})
+
 local VisualTab = Window:MakeTab({
     Name = "Visuals (Android)",
     Icon = "rbxassetid://4483345998",
@@ -3341,21 +3923,39 @@ local ESPTab = Window:MakeTab({
 })
 
 local OptTab2 = Window:MakeTab({
-    Name = "Max Perform",
+    Name = "Performance",
     Icon = "rbxassetid://4483345998",
     PremiumOnly = false
 })
 
 OptTab2:AddButton({
-    Name = "Aggressive Mobile Optimization",
+    Name = "Apply VD Low Graphics",
     Callback = function()
-        applyAggressiveMobileOptimizations()
+        pcall(function()
+            -- Use VD built-in low graphics settings
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+            local lighting = game:GetService("Lighting")
+            lighting.GlobalShadows = false
+        end)
+        OrionLib:MakeNotification({
+            Name = "Low Graphics",
+            Content = "VD built-in low graphics applied",
+            Image = "rbxassetid://4384403532",
+            Time = 3
+        })
     end    
 })
+
 OptTab2:AddButton({
     Name = "Clear All ESP (Reduce Lag)",
     Callback = function()
         clearAllESP()
+        OrionLib:MakeNotification({
+            Name = "ESP Cleared",
+            Content = "All ESP objects removed to reduce lag",
+            Image = "rbxassetid://4384403532",
+            Time = 3
+        })
     end    
 })
 
@@ -3367,63 +3967,206 @@ local SpyTab = Window:MakeTab({
     PremiumOnly = false
 })
 
-SpyTab:AddToggle({
-    Name = "Enable Remote Spy",
+-- Initialize spy log
+if not getgenv().SpyLog then getgenv().SpyLog = {} end
+if not getgenv().SpyStats then getgenv().SpyStats = {} end -- frequency tracker
+
+local SpySection = SpyTab:AddSection({ Name = "Remote Monitor" })
+
+SpySection:AddToggle({
+    Name = "Enable Remote Spy (All Types)",
     Default = false,
     Callback = function(Value)
         getgenv().EnableRemoteSpy = Value
         if Value and not getgenv().SpyHooked then
-            -- Inject Spy Logic
             getgenv().SpyHooked = true
-            local Blacklist = {
+            
+            local SpyBlacklist = {
                 ["MousePosUpdate"] = true,
                 ["CameraPos"] = true,
-                ["WalkUpdate"] = true
+                ["WalkUpdate"] = true,
+                ["UpdateCharacter"] = true,
+                ["Heartbeat"] = true,
+                ["Ping"] = true,
             }
 
-            local function formatArgs(args)
-                local str = ""
-                for i, v in pairs(args) do
-                    local t = typeof(v)
-                    local val = tostring(v)
-                    if t == "Instance" then pcall(function() val = v:GetFullName() end)
-                    elseif t == "string" then val = '"' .. val .. '"'
-                    elseif t == "table" then
-                        local tblStr = "{"
-                        local count = 0
-                        for k2, v2 in pairs(v) do
-                            if count > 5 then tblStr = tblStr .. "... "; break end
-                            tblStr = tblStr .. tostring(k2) .. "=" .. tostring(v2) .. ", "
-                            count = count + 1
-                        end
-                        val = tblStr .. "}"
+            local function fmtVal(v)
+                local t = typeof(v)
+                if t == "Instance" then
+                    local ok, name = pcall(function() return v:GetFullName() end)
+                    return "["..t.."] " .. (ok and name or tostring(v))
+                elseif t == "string" then return "[str] " .. v
+                elseif t == "table" then
+                    local out = "[table] {"
+                    local c = 0
+                    for k, v2 in pairs(v) do
+                        if c >= 8 then out = out .. "..."; break end
+                        out = out .. tostring(k) .. "=" .. tostring(v2) .. ", "; c = c + 1
                     end
-                    str = str .. "\n      ["..i.."] = ("..t..") " .. val
+                    return out .. "}"
+                elseif t == "function" then return "[function]"
+                else return "["..t.."] " .. tostring(v)
                 end
-                return str == "" and "None" or str
             end
 
-            local oldNamecall
-            oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-                if not getgenv().EnableRemoteSpy then return oldNamecall(self, ...) end
+            local function fmtArgs(args)
+                if #args == 0 then return "(no args)" end
+                local parts = {}
+                for i, v in ipairs(args) do
+                    table.insert(parts, "  [" .. i .. "] " .. fmtVal(v))
+                end
+                return "\n" .. table.concat(parts, "\n")
+            end
+
+            local function logRemote(method, remote, args, isCheat)
+                if getgenv().SpyFilterExecutor and not isCheat then return end
                 
+                local rName = ""
+                pcall(function() rName = remote:GetFullName() end)
+                if rName == "" then rName = tostring(remote) end
+
+                local shortName = rName:match("([^%.]+)$") or rName
+                if SpyBlacklist[shortName] then return end
+
+                if not getgenv().SpyStats[rName] then getgenv().SpyStats[rName] = 0 end
+                getgenv().SpyStats[rName] = getgenv().SpyStats[rName] + 1
+                local freq = getgenv().SpyStats[rName]
+
+                local caller = isCheat and "[EXC]" or "[GAME]"
+                local ts = string.format("%.2f", tick() % 10000)
+                local entry = string.format("[%s] #%d %s %s(%s) Args:%s",
+                    ts, freq, caller, method, shortName, fmtArgs(args)
+                )
+
+                print("[SPY] " .. entry)
+                table.insert(getgenv().SpyLog, entry)
+
+                if freq == 1 then
+                    print("[SPY] NEW REMOTE: " .. rName)
+                end
+            end
+
+            -- Revert to __namecall hook (it's required to catch Roblox namecalls)
+            -- FIX CRASH: Do NOT yield inside newcclosure (no table.pack(_spyOldNC(self, ...)))
+            local _spyOldNC
+            _spyOldNC = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
                 local method = getnamecallmethod()
-                if method == "FireServer" or method == "InvokeServer" then
-                    local remoteName = tostring(self)
-                    if not Blacklist[remoteName] then
+                
+                if getgenv().EnableRemoteSpy then
+                    if method == "FireServer" or method == "InvokeServer" then
                         local args = {...}
-                        local callerType = checkcaller() and "[CHEAT/EXECUTOR]" or "[GAME SCRIPT]"
-                        local logEntry = "[" .. method .. "] " .. callerType .. " -> " .. remoteName .. " | Args: " .. formatArgs(args)
-                        print("[SPY] " .. logEntry)
-                        if not getgenv().SpyLog then getgenv().SpyLog = {} end
-                        table.insert(getgenv().SpyLog, logEntry)
+                        local isCheat = checkcaller()
+                        -- Wrap in task.spawn or pcall to ensure it doesn't interrupt the call
+                        task.spawn(function() pcall(function() logRemote(method, self, args, isCheat) end) end)
                     end
                 end
-                return oldNamecall(self, ...)
-            end)
-            print("[+] SPY INJECTED VIA UI")
+                
+                return _spyOldNC(self, ...)
+            end))
+            
+            print("[SPY] Remote Spy Active (__namecall mode) | getgenv().SpyLog")
         end
     end    
+})
+
+SpySection:AddToggle({
+    Name = "Spy: Filter EXECUTOR only",
+    Default = false,
+    Callback = function(Value)
+        getgenv().SpyFilterExecutor = Value
+    end
+})
+
+local SpyActionSection = SpyTab:AddSection({ Name = "Log Actions" })
+
+SpyActionSection:AddButton({
+    Name = "📋 Print Full Log to Console",
+    Callback = function()
+        local log = getgenv().SpyLog or {}
+        print("=== WOLF SPY LOG (" .. #log .. " entries) ===")
+        for i, entry in ipairs(log) do
+            print("[" .. i .. "] " .. entry)
+        end
+        print("=== END LOG ===")
+    end
+})
+
+SpyActionSection:AddButton({
+    Name = "💾 Save Log to File",
+    Callback = function()
+        local log = getgenv().SpyLog or {}
+        if #log == 0 then
+            OrionLib:MakeNotification({
+                Name = "Spy Log Empty",
+                Content = "No remote calls recorded yet. Enable the spy first!",
+                Image = "rbxassetid://4384403532",
+                Time = 4
+            })
+            return
+        end
+        local content = "=== WolfFamilyHub Remote Spy Log ===\n"
+        content = content .. "Saved: " .. os.date("%Y-%m-%d %H:%M:%S") .. "\n"
+        content = content .. "Total Entries: " .. #log .. "\n\n"
+        content = content .. table.concat(log, "\n\n---\n\n")
+        
+        -- Frequency Report
+        content = content .. "\n\n=== FREQUENCY REPORT ===\n"
+        local sorted = {}
+        for name, count in pairs(getgenv().SpyStats or {}) do
+            table.insert(sorted, {name = name, count = count})
+        end
+        table.sort(sorted, function(a, b) return a.count > b.count end)
+        for _, entry in ipairs(sorted) do
+            content = content .. string.format("[%4d] %s\n", entry.count, entry.name)
+        end
+        
+        local ok, err = pcall(function()
+            writefile("WolfSpy_Log.txt", content)
+        end)
+        if ok then
+            OrionLib:MakeNotification({
+                Name = "Spy Log Saved",
+                Content = "Log saved to WolfSpy_Log.txt (" .. #log .. " entries)",
+                Image = "rbxassetid://4384403532",
+                Time = 5
+            })
+            print("[SPY] Log saved to: WolfSpy_Log.txt")
+        else
+            OrionLib:MakeNotification({
+                Name = "Save Failed",
+                Content = "Error: " .. tostring(err),
+                Image = "rbxassetid://4384403532",
+                Time = 5
+            })
+        end
+    end
+})
+
+SpyActionSection:AddButton({
+    Name = "🗑 Clear Spy Log",
+    Callback = function()
+        getgenv().SpyLog = {}
+        getgenv().SpyStats = {}
+        print("[SPY] Log cleared.")
+    end
+})
+
+SpyActionSection:AddButton({
+    Name = "📊 Print Frequency Report",
+    Callback = function()
+        local stats = getgenv().SpyStats or {}
+        local sorted = {}
+        for name, count in pairs(stats) do
+            table.insert(sorted, {name = name, count = count})
+        end
+        table.sort(sorted, function(a, b) return a.count > b.count end)
+        print("=== REMOTE FREQUENCY REPORT ===")
+        for i, entry in ipairs(sorted) do
+            if i > 30 then break end
+            print(string.format("[%4d calls] %s", entry.count, entry.name))
+        end
+        print("=== END REPORT ===")
+    end
 })
 
 
@@ -3435,63 +4178,19 @@ local AutoSkillTab = Window:MakeTab({
     PremiumOnly = false
 })
 
-AutoSkillTab:AddToggle({
-    Name = "Auto PERFECT Skill Check (Server)",
-    Default = false,
+AutoSkillTab:AddDropdown({
+    Name = "Skill Check Mode",
+    Default = "Legit (White Zone)",
+    Options = {"Legit (White Zone)", "Safe (Seluruh Zona Hijau)"},
     Callback = function(Value)
-        getgenv().AutoPerfectSkillCheck = Value
-        
-        if Value and not getgenv().AutoPerfectHooked then
-            getgenv().AutoPerfectHooked = true
-            
-            task.spawn(function()
-                local ReplicatedStorage = game:GetService("ReplicatedStorage")
-                local RunService = game:GetService("RunService")
-                local Players = game:GetService("Players")
-                local LocalPlayer = Players.LocalPlayer
-                local Workspace = workspace
-                
-                while getgenv().AutoPerfectSkillCheck do
-                    pcall(function()
-                        local map = Workspace:FindFirstChild("Map")
-                        if not map then return end
-                        
-                        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-                        if not remotes then return end
-                        
-                        local genRemotes = remotes:FindFirstChild("Generator")
-                        if not genRemotes then return end
-                        
-                        local repairEvent = genRemotes:FindFirstChild("RepairEvent")
-                        local skillCheckEvent = genRemotes:FindFirstChild("SkillCheckResultEvent")
-                        
-                        if repairEvent and skillCheckEvent then
-                            for _, obj in ipairs(map:GetDescendants()) do
-                                if obj:IsA("Model") and obj.Name == "Generator" then
-                                    for _, point in ipairs(obj:GetChildren()) do
-                                        if point.Name:find("GeneratorPoint") then
-                                            local progress = obj:GetAttribute("RepairProgress") or 0
-                                            if progress < 100 then
-                                                pcall(function()
-                                                    repairEvent:FireServer(point, true)
-                                                    skillCheckEvent:FireServer("success", 1, obj, point)
-                                                end)
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end)
-                    task.wait(0.3)
-                end
-            end)
-        end
+        getgenv().SkillCheckZone = Value
     end    
 })
 
+getgenv().SkillCheckZone = "Legit (White Zone)"
+
 AutoSkillTab:AddToggle({
-    Name = "Auto Perfect Skill Check",
+    Name = "Auto Skill Check (UI Based)",
     Default = false,
     Callback = function(Value)
         getgenv().AutoSkillCheck = Value
@@ -3542,8 +4241,16 @@ AutoSkillTab:AddToggle({
 
             local function InitializeAutobuy()
                 task.spawn(function()
-                    local prompt = PlayerGui:WaitForChild("SkillCheckPromptGui", 10)
-                    local check = prompt and prompt:WaitForChild("Check", 10)
+                    local prompt = PlayerGui:FindFirstChild("SkillCheckPromptGui")
+                    if not prompt then
+                        -- Not in game yet, wait for it to appear
+                        for _ = 1, 30 do
+                            task.wait(2)
+                            prompt = PlayerGui:FindFirstChild("SkillCheckPromptGui")
+                            if prompt then break end
+                        end
+                    end
+                    local check = prompt and prompt:FindFirstChild("Check")
                     if not check then return end
                     local line, goal = check:WaitForChild("Line"), check:WaitForChild("Goal")
                     
@@ -3553,12 +4260,35 @@ AutoSkillTab:AddToggle({
                             if HeartbeatConnection then HeartbeatConnection:Disconnect() end
                             HeartbeatConnection = RunService.Heartbeat:Connect(function()
                                 local lr, gr = line.Rotation % 360, goal.Rotation % 360
-                                local ss, se = (gr + 101) % 360, (gr + 115) % 360
-                                if (ss > se and (lr >= ss or lr <= se)) or (lr >= ss and lr <= se) then
-                                    TriggerButton()
-                                    if HeartbeatConnection then 
-                                        HeartbeatConnection:Disconnect() 
-                                        HeartbeatConnection = nil 
+                                
+                                if getgenv().SkillCheckZone == "Legit (White Zone)" then
+                                    -- LEGIT MODE: Hit inside the white zone (narrower than green)
+                                    -- White zone = goal +103 to +109 (center of the success arc)
+                                    local ss = (gr + 103) % 360
+                                    local se = (gr + 109) % 360
+                                    local inZone = false
+                                    if ss > se then
+                                        inZone = (lr >= ss or lr <= se)
+                                    else
+                                        inZone = (lr >= ss and lr <= se)
+                                    end
+                                    
+                                    if inZone then
+                                        TriggerButton()
+                                        if HeartbeatConnection then 
+                                            HeartbeatConnection:Disconnect() 
+                                            HeartbeatConnection = nil 
+                                        end
+                                    end
+                                else
+                                    -- SAFE MODE: Click anywhere in the green zone
+                                    local ss, se = (gr + 101) % 360, (gr + 115) % 360
+                                    if (ss > se and (lr >= ss or lr <= se)) or (lr >= ss and lr <= se) then
+                                        TriggerButton()
+                                        if HeartbeatConnection then 
+                                            HeartbeatConnection:Disconnect() 
+                                            HeartbeatConnection = nil 
+                                        end
                                     end
                                 end
                             end)
@@ -3574,6 +4304,96 @@ AutoSkillTab:AddToggle({
             game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function() 
                 task.wait(1) 
                 InitializeAutobuy() 
+            end)
+        end
+    end    
+})
+
+-- FULL BRIGHT TOGGLE (Add to Visual Tab)
+local VisualSection2 = VisualTab:AddSection({
+    Name = "Visual Extras"
+})
+
+VisualSection2:AddButton({
+    Name = "Remove Post Processing",
+    Callback = function()
+        local Lighting = game:GetService("Lighting")
+        local count = 0
+        -- Remove from Lighting
+        for _, e in ipairs(Lighting:GetChildren()) do
+            if e:IsA("PostEffect") or e:IsA("BloomEffect") or 
+               e:IsA("ColorCorrectionEffect") or e:IsA("DepthOfFieldEffect") or
+               e:IsA("SunRaysEffect") or e:IsA("BlurEffect") then
+                e:Destroy()
+                count = count + 1
+            end
+        end
+        -- Remove from workspace camera too
+        local cam = workspace.CurrentCamera
+        if cam then
+            for _, e in ipairs(cam:GetChildren()) do
+                if e:IsA("PostEffect") then e:Destroy(); count = count + 1 end
+            end
+        end
+        print("[FX] Removed " .. count .. " post effects")
+    end
+})
+
+VisualSection2:AddButton({
+    Name = "Remove Post Processing",
+    Callback = function()
+        local Lighting = game:GetService("Lighting")
+        local count = 0
+        -- Remove from Lighting
+        for _, e in ipairs(Lighting:GetChildren()) do
+            if e:IsA("PostEffect") or e:IsA("BloomEffect") or 
+               e:IsA("ColorCorrectionEffect") or e:IsA("DepthOfFieldEffect") or
+               e:IsA("SunRaysEffect") or e:IsA("BlurEffect") then
+                e:Destroy()
+                count = count + 1
+            end
+        end
+        -- Remove from workspace camera too
+        local cam = workspace.CurrentCamera
+        if cam then
+            for _, e in ipairs(cam:GetChildren()) do
+                if e:IsA("PostEffect") then e:Destroy(); count = count + 1 end
+            end
+        end
+        print("[FX] Removed " .. count .. " post effects")
+    end
+})
+
+VisualSection2:AddToggle({
+    Name = "Full Bright",
+    Default = false,
+    Callback = function(Value)
+        getgenv().FullBrightEnabled = Value
+        if Value and not getgenv().FullBrightLoop then
+            getgenv().FullBrightLoop = true
+            task.spawn(function()
+                local Lighting = game:GetService("Lighting")
+                while getgenv().FullBrightEnabled do
+                    pcall(function()
+                        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+                        Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+                        Lighting.Brightness = 2
+                        Lighting.ClockTime = 14
+                        Lighting.GlobalShadows = false
+                        Lighting.FogEnd = 9e9
+                        Lighting.FogStart = 9e9
+                        for _, e in ipairs(Lighting:GetChildren()) do
+                            if e:IsA("ColorCorrectionEffect") then
+                                e.Brightness = 0.1
+                                e.Contrast = 0
+                            elseif e:IsA("BloomEffect") then
+                                e.Enabled = false
+                            end
+                        end
+                    end)
+                    task.wait(1)
+                end
+                getgenv().FullBrightLoop = false
             end)
         end
     end    
