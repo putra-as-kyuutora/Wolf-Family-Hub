@@ -2946,43 +2946,6 @@ local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
 
--- SILENT AIM HOOK
-local OldNamecall
-OldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-    local args = {...}
-    local method = getnamecallmethod()
-    
-    if CombatHacks.SilentAimEnabled and method == "Raycast" and self == workspace then
-        -- Only override if we have a target
-        local target = GetClosestPlayer()
-        
-        -- Hit chance check
-        local chance = math.random(1, 100)
-        if target and target.Character and chance <= CombatHacks.SilentAimHitChance then
-            
-            local targetPartName = CombatHacks.TargetPart
-            if targetPartName == "Torso" and not target.Character:FindFirstChild("Torso") and target.Character:FindFirstChild("UpperTorso") then
-                targetPartName = "UpperTorso"
-            end
-            
-            local targetPart = target.Character:FindFirstChild(targetPartName)
-            if targetPart then
-                -- Modify the raycast direction to point directly at the target
-                -- Raycast args: origin, direction, raycastParams
-                if typeof(args[1]) == "Vector3" and typeof(args[2]) == "Vector3" then
-                    local origin = args[1]
-                    local targetPos = targetPart.Position
-                    local direction = (targetPos - origin).Unit * 1000 -- Shoot towards target
-                    
-                    args[2] = direction
-                    return OldNamecall(self, unpack(args))
-                end
-            end
-        end
-    end
-    
-    return OldNamecall(self, ...)
-end))
 
 local VisualHacks = {
     KillerChams = false,
@@ -3137,6 +3100,45 @@ local function GetClosestPlayer()
     
     return closestPlayer
 end
+
+-- SILENT AIM HOOK
+local OldNamecall
+OldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    local args = {...}
+    local method = getnamecallmethod()
+    
+    if CombatHacks.SilentAimEnabled and method == "Raycast" and self == workspace then
+        -- Only override if we have a target
+        local target = GetClosestPlayer()
+        
+        -- Hit chance check
+        local chance = math.random(1, 100)
+        if target and target.Character and chance <= CombatHacks.SilentAimHitChance then
+            
+            local targetPartName = CombatHacks.TargetPart
+            if targetPartName == "Torso" and not target.Character:FindFirstChild("Torso") and target.Character:FindFirstChild("UpperTorso") then
+                targetPartName = "UpperTorso"
+            end
+            
+            local targetPart = target.Character:FindFirstChild(targetPartName)
+            if targetPart then
+                -- Modify the raycast direction to point directly at the target
+                -- Raycast args: origin, direction, raycastParams
+                if typeof(args[1]) == "Vector3" and typeof(args[2]) == "Vector3" then
+                    local origin = args[1]
+                    local targetPos = targetPart.Position
+                    local direction = (targetPos - origin).Unit * 1000 -- Shoot towards target
+                    
+                    args[2] = direction
+                    return OldNamecall(self, unpack(args))
+                end
+            end
+        end
+    end
+    
+    return OldNamecall(self, ...)
+end))
+
 
 table.insert(CombatHacks.Connections, RunService.RenderStepped:Connect(function()
     -- Update FOV
