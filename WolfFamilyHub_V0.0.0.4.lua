@@ -2947,71 +2947,75 @@ local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 
 local VisualHacks = {
-    ChamsEnabled = false,
-    FillColor = Color3.fromRGB(180, 20, 20),
-    OutlineColor = Color3.fromRGB(255, 255, 255),
+    KillerChams = false,
+    KillerColor = Color3.fromRGB(255, 93, 108),
+    SurvivorChams = false,
+    SurvivorColor = Color3.fromRGB(64, 224, 255),
+    GeneratorChams = false,
+    GeneratorColor = Color3.fromRGB(150, 0, 200),
     Highlights = {},
     Connections = {}
 }
 
--- Buat folder khusus di CoreGui agar tidak terdeteksi oleh game
 local ESPFolder = Instance.new("Folder")
 ESPFolder.Name = "WolfESP"
 pcall(function() ESPFolder.Parent = CoreGui end)
 if ESPFolder.Parent == nil then ESPFolder.Parent = game:GetService("StarterGui") end
 
-local function CreateChams(player)
-    if player == LocalPlayer then return end
-    
-    local highlight = Instance.new("Highlight")
-    highlight.Name = player.Name
-    highlight.FillColor = VisualHacks.FillColor
-    highlight.OutlineColor = VisualHacks.OutlineColor
-    highlight.FillTransparency = 0.5
-    highlight.OutlineTransparency = 0
-    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- Tembus tembok
-    highlight.Enabled = false
-    highlight.Parent = ESPFolder
-    
-    VisualHacks.Highlights[player] = highlight
-end
-
-local function RemoveChams(player)
-    if VisualHacks.Highlights[player] then
-        VisualHacks.Highlights[player]:Destroy()
-        VisualHacks.Highlights[player] = nil
+local function ApplyCham(obj, color, enabled)
+    if not obj then return end
+    local highlight = VisualHacks.Highlights[obj]
+    if not highlight then
+        highlight = Instance.new("Highlight")
+        highlight.Name = "Cham_" .. tostring(obj)
+        highlight.FillTransparency = 0.5
+        highlight.OutlineTransparency = 0
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.Parent = ESPFolder
+        VisualHacks.Highlights[obj] = highlight
     end
+    highlight.Adornee = obj
+    highlight.FillColor = color
+    highlight.OutlineColor = color
+    highlight.Enabled = enabled
 end
 
-for _, player in pairs(Players:GetPlayers()) do
-    CreateChams(player)
-end
-
-table.insert(VisualHacks.Connections, Players.PlayerAdded:Connect(CreateChams))
-table.insert(VisualHacks.Connections, Players.PlayerRemoving:Connect(RemoveChams))
-
-table.insert(VisualHacks.Connections, RunService.RenderStepped:Connect(function()
-    for player, highlight in pairs(VisualHacks.Highlights) do
-        if VisualHacks.ChamsEnabled and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-            highlight.Adornee = player.Character
-            highlight.Enabled = true
-        else
-            highlight.Adornee = nil
-            highlight.Enabled = false
+local function UpdateAllChams()
+    -- Players
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local isKiller = player.Team and player.Team.Name:lower():find("killer") ~= nil
+            if isKiller then
+                ApplyCham(player.Character, VisualHacks.KillerColor, VisualHacks.KillerChams)
+            else
+                ApplyCham(player.Character, VisualHacks.SurvivorColor, VisualHacks.SurvivorChams)
+            end
         end
     end
-end))
-
-function VisualHacks:ToggleChams(state)
-    self.ChamsEnabled = state
-end
-
-function VisualHacks:SetColor(color)
-    self.FillColor = color
-    for _, highlight in pairs(self.Highlights) do
-        highlight.FillColor = color
+    
+    -- Generators
+    local map = workspace:FindFirstChild("Map")
+    if map then
+        for _, obj in ipairs(map:GetDescendants()) do
+            if obj:IsA("Model") and obj.Name == "Generator" then
+                ApplyCham(obj, VisualHacks.GeneratorColor, VisualHacks.GeneratorChams)
+            end
+        end
     end
 end
+
+table.insert(VisualHacks.Connections, RunService.RenderStepped:Connect(function()
+    UpdateAllChams()
+end))
+
+function VisualHacks:ToggleKiller(state) self.KillerChams = state end
+function VisualHacks:SetKillerColor(color) self.KillerColor = color end
+
+function VisualHacks:ToggleSurvivor(state) self.SurvivorChams = state end
+function VisualHacks:SetSurvivorColor(color) self.SurvivorColor = color end
+
+function VisualHacks:ToggleGenerator(state) self.GeneratorChams = state end
+function VisualHacks:SetGeneratorColor(color) self.GeneratorColor = color end
 
 getgenv().VisualHacks = VisualHacks
 
@@ -3232,180 +3236,58 @@ local VisualTab = Window:MakeTab({
 })
 
 local VisualSection = VisualTab:AddSection({
-    Name = "Lightweight Chams"
+    Name = "Lightweight Chams (ESP)"
 })
 
 VisualSection:AddToggle({
-    Name = "Enable Chams (Tembus Tembok)",
+    Name = "Killer Chams",
     Default = false,
     Callback = function(Value)
-        if getgenv().VisualHacks then getgenv().VisualHacks:ToggleChams(Value) end
+        if getgenv().VisualHacks then getgenv().VisualHacks:ToggleKiller(Value) end
     end    
 })
-
 VisualSection:AddColorpicker({
-    Name = "Warna Chams",
-    Default = Color3.fromRGB(180, 20, 20),
+    Name = "Killer Color",
+    Default = Color3.fromRGB(255, 93, 108),
     Callback = function(Value)
-        if getgenv().VisualHacks then getgenv().VisualHacks:SetColor(Value) end
-    end
+        if getgenv().VisualHacks then getgenv().VisualHacks:SetKillerColor(Value) end
+    end    
 })
 
--- O P T I M I Z A T I O N   T A B
-local OptTab = Window:MakeTab({
-    Name = "Optimization",
-    Icon = "rbxassetid://4483345998",
-    PremiumOnly = false
-})
-
-local OptSection = OptTab:AddSection({
-    Name = "Mobile FPS Boost"
-})
-
-OptSection:AddButton({
-    Name = "Optimize Graphics (Anti-Lag)",
-    Callback = function()
-        pcall(function()
-            local Lighting = game:GetService("Lighting")
-            Lighting.GlobalShadows = false
-            Lighting.FogEnd = 9e9
-            
-            for _, obj in ipairs(workspace:GetDescendants()) do
-                if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
-                    obj.Enabled = false
-                elseif obj:IsA("BasePart") then
-                    obj.Material = Enum.Material.SmoothPlastic
-                    obj.Reflectance = 0
-                elseif obj:IsA("Decal") or obj:IsA("Texture") then
-                    obj.Transparency = 1
-                end
-            end
-            
-            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-        end)
-    end
-})
-
--- C O M B A T   T A B
-local CombatTab = Window:MakeTab({
-    Name = "Combat",
-    Icon = "rbxassetid://4483345998",
-    PremiumOnly = false
-})
-
-local CombatSection = CombatTab:AddSection({
-    Name = "Aimbot Settings"
-})
-
-CombatSection:AddToggle({
-    Name = "Auto Aimbot (Mobile/PC)",
+VisualSection:AddToggle({
+    Name = "Survivor Chams",
     Default = false,
     Callback = function(Value)
-        if getgenv().CombatHacks then getgenv().CombatHacks:ToggleAimbot(Value) end
+        if getgenv().VisualHacks then getgenv().VisualHacks:ToggleSurvivor(Value) end
+    end    
+})
+VisualSection:AddColorpicker({
+    Name = "Survivor Color",
+    Default = Color3.fromRGB(64, 224, 255),
+    Callback = function(Value)
+        if getgenv().VisualHacks then getgenv().VisualHacks:SetSurvivorColor(Value) end
     end    
 })
 
-CombatSection:AddToggle({
-    Name = "Show FOV Circle",
+VisualSection:AddToggle({
+    Name = "Generator Chams",
     Default = false,
     Callback = function(Value)
-        if getgenv().CombatHacks then getgenv().CombatHacks:ToggleFOV(Value) end
+        if getgenv().VisualHacks then getgenv().VisualHacks:ToggleGenerator(Value) end
     end    
 })
-
-CombatSection:AddDropdown({
-    Name = "Aimbot Target",
-    Default = "All",
-    Options = {"All", "Killer", "Survivor"},
+VisualSection:AddColorpicker({
+    Name = "Generator Color",
+    Default = Color3.fromRGB(150, 0, 200),
     Callback = function(Value)
-        if getgenv().CombatHacks then getgenv().CombatHacks:SetTargetType(Value) end
+        if getgenv().VisualHacks then getgenv().VisualHacks:SetGeneratorColor(Value) end
     end    
 })
-
-CombatSection:AddDropdown({
-    Name = "Target Part",
-    Default = "Head",
-    Options = {"Head", "Torso", "HumanoidRootPart"},
-    Callback = function(Value)
-        if getgenv().CombatHacks then getgenv().CombatHacks:SetTargetPart(Value) end
-    end    
-})
-
-CombatSection:AddSlider({
-    Name = "FOV Radius",
-    Min = 50,
-    Max = 800,
-    Default = 150,
-    Color = Color3.fromRGB(180, 20, 20),
-    Increment = 10,
-    ValueName = "px",
-    Callback = function(Value)
-        if getgenv().CombatHacks then getgenv().CombatHacks:SetRadius(Value) end
-    end    
-})
-
-CombatSection:AddSlider({
-    Name = "Aimbot Smoothness",
-    Min = 1,
-    Max = 10,
-    Default = 5,
-    Color = Color3.fromRGB(180, 20, 20),
-    Increment = 1,
-    ValueName = "",
-    Callback = function(Value)
-        if getgenv().CombatHacks then getgenv().CombatHacks:SetSmoothness(Value / 10) end
-    end    
-})
-
-
--- === NEW INTEGRATED FEATURES ===
 
 local ESPTab = Window:MakeTab({
     Name = "Full ESP",
     Icon = "rbxassetid://4483345998",
     PremiumOnly = false
-})
-
-local ESPPlayers = ESPTab:AddSection({ Name = "Player ESP" })
-ESPPlayers:AddToggle({
-    Name = "Enable Player ESP",
-    Default = false,
-    Callback = function(Value)
-        Config.ESP.Players.Enabled = Value
-        if Value then startESP() else clearAllESP() end
-    end    
-})
-ESPPlayers:AddToggle({
-    Name = "Show Boxes",
-    Default = false,
-    Callback = function(Value) Config.ESP.Players.Boxes = Value; updateAllESP() end    
-})
-ESPPlayers:AddToggle({
-    Name = "Show Names",
-    Default = false,
-    Callback = function(Value) Config.ESP.Players.Names = Value; updateAllESP() end    
-})
-ESPPlayers:AddToggle({
-    Name = "Show Health",
-    Default = false,
-    Callback = function(Value) Config.ESP.Players.Health = Value; updateAllESP() end    
-})
-ESPPlayers:AddToggle({
-    Name = "Show Distance",
-    Default = false,
-    Callback = function(Value) Config.ESP.Players.Distance = Value; updateAllESP() end    
-})
-
-local ESPObjects = ESPTab:AddSection({ Name = "Object ESP" })
-ESPObjects:AddToggle({
-    Name = "Generator ESP",
-    Default = false,
-    Callback = function(Value) Config.ESP.Generator = Value; updateAllESP() end    
-})
-ESPObjects:AddToggle({
-    Name = "Gate ESP",
-    Default = false,
-    Callback = function(Value) Config.ESP.Gate = Value; updateAllESP() end    
 })
 
 local OptTab2 = Window:MakeTab({
