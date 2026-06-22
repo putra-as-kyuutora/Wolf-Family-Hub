@@ -241,7 +241,8 @@ local function applyMobileOptimizations()
     
     safeCall(function()
         
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        -- Level03 = low graphics without causing visual artifacts (flat look)
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level03
         
         
         lighting.GlobalShadows = false
@@ -290,18 +291,17 @@ local function applyAggressiveMobileOptimizations()
     
     safeCall(function()
         local workspace = Workspace
+        local lighting = game:GetService("Lighting")
         
-        
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-        settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level01
-        settings().Rendering.EnableFRM = false
-        
+        -- Safer: Only disable particles and shadows (not full Level01 which causes flat graphics)
+        lighting.GlobalShadows = false
+        lighting.FogEnd = 9e9
         
         for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("Texture") or obj:IsA("Decal") then
-                obj.Transparency = 1
-            elseif obj:IsA("SurfaceAppearance") then
-                obj.Parent = nil
+            if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") then
+                obj.Enabled = false
+            elseif obj:IsA("Atmosphere") then
+                obj.Density = 0
             end
         end
         
@@ -336,7 +336,7 @@ local function applyPerformanceSettings()
     
     if Config.Performance.LowerGraphics then
         safeCall(function()
-            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Level03
         end)
     end
     
@@ -2946,6 +2946,44 @@ local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
 
+-- SILENT AIM HOOK
+local OldNamecall
+OldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    local args = {...}
+    local method = getnamecallmethod()
+    
+    if CombatHacks.SilentAimEnabled and method == "Raycast" and self == workspace then
+        -- Only override if we have a target
+        local target = GetClosestPlayer()
+        
+        -- Hit chance check
+        local chance = math.random(1, 100)
+        if target and target.Character and chance <= CombatHacks.SilentAimHitChance then
+            
+            local targetPartName = CombatHacks.TargetPart
+            if targetPartName == "Torso" and not target.Character:FindFirstChild("Torso") and target.Character:FindFirstChild("UpperTorso") then
+                targetPartName = "UpperTorso"
+            end
+            
+            local targetPart = target.Character:FindFirstChild(targetPartName)
+            if targetPart then
+                -- Modify the raycast direction to point directly at the target
+                -- Raycast args: origin, direction, raycastParams
+                if typeof(args[1]) == "Vector3" and typeof(args[2]) == "Vector3" then
+                    local origin = args[1]
+                    local targetPos = targetPart.Position
+                    local direction = (targetPos - origin).Unit * 1000 -- Shoot towards target
+                    
+                    args[2] = direction
+                    return OldNamecall(self, unpack(args))
+                end
+            end
+        end
+    end
+    
+    return OldNamecall(self, ...)
+end))
+
 local VisualHacks = {
     KillerChams = false,
     KillerColor = Color3.fromRGB(255, 93, 108),
@@ -3031,6 +3069,8 @@ local Camera = workspace.CurrentCamera
 
 local CombatHacks = {
     AimbotEnabled = false,
+    SilentAimEnabled = false,
+    SilentAimHitChance = 100,
     AimbotRadius = 150,
     AimbotSmoothness = 0.5,
     ShowFOV = false,
@@ -3160,6 +3200,14 @@ end
 
 function CombatHacks:SetTargetPart(part)
     self.TargetPart = part
+end
+
+function CombatHacks:ToggleSilentAim(state)
+    self.SilentAimEnabled = state
+end
+
+function CombatHacks:SetSilentAimHitChance(val)
+    self.SilentAimHitChance = val
 end
 
 getgenv().CombatHacks = CombatHacks
@@ -3362,9 +3410,11 @@ SpyTab:AddToggle({
                     local remoteName = tostring(self)
                     if not Blacklist[remoteName] then
                         local args = {...}
-                        local callerType = checkcaller() and "👾 [CHEAT/EXECUTOR]" or "🎮 [GAME SCRIPT]"
-                        print("\n[" .. method .. "] " .. callerType .. " -> " .. remoteName)
-                        print("   Arguments: " .. formatArgs(args))
+                        local callerType = checkcaller() and "[CHEAT/EXECUTOR]" or "[GAME SCRIPT]"
+                        local logEntry = "[" .. method .. "] " .. callerType .. " -> " .. remoteName .. " | Args: " .. formatArgs(args)
+                        print("[SPY] " .. logEntry)
+                        if not getgenv().SpyLog then getgenv().SpyLog = {} end
+                        table.insert(getgenv().SpyLog, logEntry)
                     end
                 end
                 return oldNamecall(self, ...)
@@ -3381,6 +3431,61 @@ local AutoSkillTab = Window:MakeTab({
     Name = "Skill Check",
     Icon = "rbxassetid://4483345998",
     PremiumOnly = false
+})
+
+AutoSkillTab:AddToggle({
+    Name = "Auto PERFECT Skill Check (Server)",
+    Default = false,
+    Callback = function(Value)
+        getgenv().AutoPerfectSkillCheck = Value
+        
+        if Value and not getgenv().AutoPerfectHooked then
+            getgenv().AutoPerfectHooked = true
+            
+            task.spawn(function()
+                local ReplicatedStorage = game:GetService("ReplicatedStorage")
+                local RunService = game:GetService("RunService")
+                local Players = game:GetService("Players")
+                local LocalPlayer = Players.LocalPlayer
+                local Workspace = workspace
+                
+                while getgenv().AutoPerfectSkillCheck do
+                    pcall(function()
+                        local map = Workspace:FindFirstChild("Map")
+                        if not map then return end
+                        
+                        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+                        if not remotes then return end
+                        
+                        local genRemotes = remotes:FindFirstChild("Generator")
+                        if not genRemotes then return end
+                        
+                        local repairEvent = genRemotes:FindFirstChild("RepairEvent")
+                        local skillCheckEvent = genRemotes:FindFirstChild("SkillCheckResultEvent")
+                        
+                        if repairEvent and skillCheckEvent then
+                            for _, obj in ipairs(map:GetDescendants()) do
+                                if obj:IsA("Model") and obj.Name == "Generator" then
+                                    for _, point in ipairs(obj:GetChildren()) do
+                                        if point.Name:find("GeneratorPoint") then
+                                            local progress = obj:GetAttribute("RepairProgress") or 0
+                                            if progress < 100 then
+                                                pcall(function()
+                                                    repairEvent:FireServer(point, true)
+                                                    skillCheckEvent:FireServer("success", 1, obj, point)
+                                                end)
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                    task.wait(0.3)
+                end
+            end)
+        end
+    end    
 })
 
 AutoSkillTab:AddToggle({
