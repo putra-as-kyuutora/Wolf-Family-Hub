@@ -3031,6 +3031,8 @@ local CombatHacks = {
     AimbotSmoothness = 0.5,
     ShowFOV = false,
     FOVColor = Color3.fromRGB(180, 20, 20),
+    TargetType = "All", -- "All", "Killer", "Survivor"
+    TargetPart = "Head", -- "Head", "Torso", "HumanoidRootPart"
     Connections = {},
     Target = nil
 }
@@ -3051,13 +3053,39 @@ local function GetClosestPlayer()
     local mousePos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 and player.Character:FindFirstChild("Head") then
-            local pos, onScreen = Camera:WorldToViewportPoint(player.Character.Head.Position)
-            if onScreen then
-                local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-                if dist < closestDist then
-                    closestDist = dist
-                    closestPlayer = player
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            
+            -- Filter by Team (Killer/Survivor)
+            local isKiller = player.Team and player.Team.Name:lower():find("killer") ~= nil
+            local isValidTarget = false
+            
+            if CombatHacks.TargetType == "All" then
+                isValidTarget = true
+            elseif CombatHacks.TargetType == "Killer" and isKiller then
+                isValidTarget = true
+            elseif CombatHacks.TargetType == "Survivor" and not isKiller then
+                isValidTarget = true
+            end
+            
+            if isValidTarget then
+                local targetPartName = CombatHacks.TargetPart
+                if targetPartName == "Torso" then
+                    -- Support for R15 and R6
+                    if not player.Character:FindFirstChild("Torso") and player.Character:FindFirstChild("UpperTorso") then
+                        targetPartName = "UpperTorso"
+                    end
+                end
+                
+                local targetPart = player.Character:FindFirstChild(targetPartName)
+                if targetPart then
+                    local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+                    if onScreen then
+                        local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                        if dist < closestDist then
+                            closestDist = dist
+                            closestPlayer = player
+                        end
+                    end
                 end
             end
         end
@@ -3075,14 +3103,30 @@ table.insert(CombatHacks.Connections, RunService.RenderStepped:Connect(function(
 
     -- Aimbot logic
     if CombatHacks.AimbotEnabled then
-        if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then -- Right click to aim
+        -- Mobile optimization: Auto-aim without needing right-click
+        local isAiming = false
+        if UserInputService.TouchEnabled then
+            isAiming = true 
+        else
+            isAiming = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+        end
+        
+        if isAiming then
             local target = GetClosestPlayer()
-            if target and target.Character and target.Character:FindFirstChild("Head") then
-                local targetPos = target.Character.Head.Position
-                local currentCFrame = Camera.CFrame
-                local newCFrame = CFrame.new(currentCFrame.Position, targetPos)
+            if target and target.Character then
+                local targetPartName = CombatHacks.TargetPart
+                if targetPartName == "Torso" and not target.Character:FindFirstChild("Torso") and target.Character:FindFirstChild("UpperTorso") then
+                    targetPartName = "UpperTorso"
+                end
                 
-                Camera.CFrame = currentCFrame:Lerp(newCFrame, CombatHacks.AimbotSmoothness)
+                local targetPart = target.Character:FindFirstChild(targetPartName)
+                if targetPart then
+                    local targetPos = targetPart.Position
+                    local currentCFrame = Camera.CFrame
+                    local newCFrame = CFrame.new(currentCFrame.Position, targetPos)
+                    
+                    Camera.CFrame = currentCFrame:Lerp(newCFrame, CombatHacks.AimbotSmoothness)
+                end
             end
         end
     end
@@ -3103,6 +3147,15 @@ end
 
 function CombatHacks:SetSmoothness(val)
     self.AimbotSmoothness = val
+end
+
+
+function CombatHacks:SetTargetType(type)
+    self.TargetType = type
+end
+
+function CombatHacks:SetTargetPart(part)
+    self.TargetPart = part
 end
 
 getgenv().CombatHacks = CombatHacks
@@ -3245,7 +3298,7 @@ local CombatSection = CombatTab:AddSection({
 })
 
 CombatSection:AddToggle({
-    Name = "Silent Aimbot (Right Click)",
+    Name = "Auto Aimbot (Mobile/PC)",
     Default = false,
     Callback = function(Value)
         if getgenv().CombatHacks then getgenv().CombatHacks:ToggleAimbot(Value) end
@@ -3257,6 +3310,24 @@ CombatSection:AddToggle({
     Default = false,
     Callback = function(Value)
         if getgenv().CombatHacks then getgenv().CombatHacks:ToggleFOV(Value) end
+    end    
+})
+
+CombatSection:AddDropdown({
+    Name = "Aimbot Target",
+    Default = "All",
+    Options = {"All", "Killer", "Survivor"},
+    Callback = function(Value)
+        if getgenv().CombatHacks then getgenv().CombatHacks:SetTargetType(Value) end
+    end    
+})
+
+CombatSection:AddDropdown({
+    Name = "Target Part",
+    Default = "Head",
+    Options = {"Head", "Torso", "HumanoidRootPart"},
+    Callback = function(Value)
+        if getgenv().CombatHacks then getgenv().CombatHacks:SetTargetPart(Value) end
     end    
 })
 
@@ -3329,12 +3400,12 @@ local ESPObjects = ESPTab:AddSection({ Name = "Object ESP" })
 ESPObjects:AddToggle({
     Name = "Generator ESP",
     Default = false,
-    Callback = function(Value) Config.ESP.Generators.Enabled = Value; updateAllESP() end    
+    Callback = function(Value) Config.ESP.Generator = Value; updateAllESP() end    
 })
 ESPObjects:AddToggle({
     Name = "Gate ESP",
     Default = false,
-    Callback = function(Value) Config.ESP.Gates.Enabled = Value; updateAllESP() end    
+    Callback = function(Value) Config.ESP.Gate = Value; updateAllESP() end    
 })
 
 local OptTab2 = Window:MakeTab({
@@ -3417,6 +3488,104 @@ SpyTab:AddToggle({
                 return oldNamecall(self, ...)
             end)
             print("[+] SPY INJECTED VIA UI")
+        end
+    end    
+})
+
+
+-- === AUTO PERFECT SKILL CHECK FOR MOBILE ===
+
+local AutoSkillTab = Window:MakeTab({
+    Name = "Skill Check",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+AutoSkillTab:AddToggle({
+    Name = "Auto Perfect Skill Check",
+    Default = false,
+    Callback = function(Value)
+        getgenv().AutoSkillCheck = Value
+        
+        if Value and not getgenv().AutoSkillCheckInjected then
+            getgenv().AutoSkillCheckInjected = true
+            
+            local VirtualInputManager = game:GetService("VirtualInputManager")
+            local GuiService = game:GetService("GuiService")
+            local RunService = game:GetService("RunService")
+            local PlayerGui = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+            
+            local TouchID = 8822
+            local ActionPath = "Survivor-mob.Controls.action.check"
+            local HeartbeatConnection = nil
+            local VisibilityConnection = nil
+            
+            local function GetActionTarget()
+                local current = PlayerGui
+                for segment in string.gmatch(ActionPath, "[^%.]+") do 
+                    current = current and current:FindFirstChild(segment) 
+                end
+                return current
+            end
+
+            local function TriggerButton()
+                local isMobile = game:GetService("UserInputService").TouchEnabled
+                if isMobile then
+                    local b = GetActionTarget()
+                    if b and b:IsA("GuiObject") then
+                        local p, s, i = b.AbsolutePosition, b.AbsoluteSize, GuiService:GetGuiInset()
+                        local cx, cy = p.X + (s.X/2) + i.X, p.Y + (s.Y/2) + i.Y
+                        pcall(function() 
+                            VirtualInputManager:SendTouchEvent(TouchID, 0, cx, cy) 
+                            task.wait(0.01) 
+                            VirtualInputManager:SendTouchEvent(TouchID, 2, cx, cy) 
+                        end)
+                    end
+                else
+                    -- For PC
+                    pcall(function()
+                        keypress(0x20)
+                        task.wait(0.05)
+                        keyrelease(0x20)
+                    end)
+                end
+            end
+
+            local function InitializeAutobuy()
+                task.spawn(function()
+                    local prompt = PlayerGui:WaitForChild("SkillCheckPromptGui", 10)
+                    local check = prompt and prompt:WaitForChild("Check", 10)
+                    if not check then return end
+                    local line, goal = check:WaitForChild("Line"), check:WaitForChild("Goal")
+                    
+                    if VisibilityConnection then VisibilityConnection:Disconnect() end
+                    VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()
+                        if getgenv().AutoSkillCheck and check.Visible then
+                            if HeartbeatConnection then HeartbeatConnection:Disconnect() end
+                            HeartbeatConnection = RunService.Heartbeat:Connect(function()
+                                local lr, gr = line.Rotation % 360, goal.Rotation % 360
+                                local ss, se = (gr + 101) % 360, (gr + 115) % 360
+                                if (ss > se and (lr >= ss or lr <= se)) or (lr >= ss and lr <= se) then
+                                    TriggerButton()
+                                    if HeartbeatConnection then 
+                                        HeartbeatConnection:Disconnect() 
+                                        HeartbeatConnection = nil 
+                                    end
+                                end
+                            end)
+                        elseif HeartbeatConnection then 
+                            HeartbeatConnection:Disconnect() 
+                            HeartbeatConnection = nil 
+                        end
+                    end)
+                end)
+            end
+            
+            InitializeAutobuy()
+            game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function() 
+                task.wait(1) 
+                InitializeAutobuy() 
+            end)
         end
     end    
 })
