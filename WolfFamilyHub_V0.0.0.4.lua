@@ -1129,16 +1129,6 @@ local function stopESP()
 end
 
 
-local Window = Rayfield:CreateWindow({
-    Name = "🎮 Golds Easy Hub - Violence District v2.2",
-    LoadingTitle = "Loading Mobile-Compatible Script",
-    LoadingSubtitle = "by goldgoldgoldblazn | " .. (isMobile and "Mobile Mode" or "PC Mode"),
-    ConfigurationSaving = {
-        Enabled = true, 
-        FolderName = nil,
-        FileName = "ViolenceDistrictConfig"
-    },
-    Discord = {
 -- === END CORE LOGIC ===
 
 
